@@ -6,6 +6,7 @@ from typing import Tuple, Dict, Any
 
 class Config:
     def __init__(self):
+        """Initializing addon directory and ID"""
         self.addon_dir = os.path.dirname(os.path.abspath(__file__))
         self.addon_id = os.path.basename(self.addon_dir)
         
@@ -15,6 +16,8 @@ class Config:
         if config is None:
             config = {
                 'lutedb_path': 'Open file manager',
+                'parents_only': False,
+                'empty_translation': False,
                 'allow_duplicates': False,
                 'import_tags': True,
                 'selected_deck': "Default",
@@ -46,18 +49,20 @@ class Config:
             return False
         
     def get_config_param(self, param: str):
-        defaults = {
-            'lutedb_path': 'Open file manager',
-            'allow_duplicates': False,
-            'import_tags': True,
-            'selected_deck': "Default",
-            'adjust_ease': False,
-            'include_WKI': False
-        }
-        
+        """Loading parameters from config.json file"""
         try:
             conf = self.get_config()
             return conf.get(param)
         except Exception as e:
+            defaults = {
+                'lutedb_path': 'Open file manager',
+                'parents_only': False,
+                'empty_translation': False,
+                'allow_duplicates': False,
+                'import_tags': True,
+                'selected_deck': "Default",
+                'adjust_ease': False,
+                'include_WKI': False
+                }
             print(f'Debug - Loading {param} failed: {str(e)}')
             return defaults.get(param)  # Returns the default value for the param

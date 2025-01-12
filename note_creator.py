@@ -5,7 +5,8 @@ from typing import Optional, List
 
 class NoteCreator:
     def __init__(self, model_name: str, deck_name: str, allow_duplicates: bool,
-                 import_tags: bool, adjust_ease: bool, include_WKI: bool, tags: List[str], days_filter: int):
+                 import_tags: bool, adjust_ease: bool, include_WKI: bool, tags: List[str]):
+        """Initialization of passed values used for card creation"""
         self.model_name = model_name
         self.deck_name = deck_name
         self.allow_duplicates = allow_duplicates
@@ -13,17 +14,17 @@ class NoteCreator:
         self.adjust_ease = adjust_ease
         self.include_WKI = include_WKI
         self.tags = tags
-        self.days_filter = days_filter
         
     def create_cards(self, terms: List, selected_lang: str) -> int:
-        """Creates Anki cards from LUTE terms"""
+        """Adds Anki cards from LUTE terms into deck with specified settings"""
         try:
+            # sets in which deck the cards should be created and initializes counter of created cards
             deck_id = mw.col.decks.id_for_name(self.deck_name)
             counter = 0
-            cutoff_date = str(date.today() - timedelta(days=self.days_filter))
 
+            # checks whether a term should be allowed to be turned into card and whether its ease shoudl be adjusted
             for term in terms:
-                if not self._should_process_term(term, selected_lang, cutoff_date, self.include_WKI):
+                if not self._should_process_term(term, selected_lang):
                     continue
                     
                 note = self._create_note(term, self.adjust_ease)
@@ -39,17 +40,18 @@ class NoteCreator:
             showInfo(f'Error creating cards: {str(e)}')
             return 0
             
-    def _should_process_term(self, term, selected_lang: str, cutoff_date: str, include_WKI: bool) -> bool:
-        if include_WKI:
-            include_status = term[8] <= 5 or term[8] in [98, 99]
-        else:
-            include_status = term[8] <= 5
-        return term[2] == selected_lang and cutoff_date < term[3] and include_status
+    def _should_process_term(self, term, selected_lang: str) -> bool:
+        """Filters terms that should be turned into notes, returns true for those meeting all set conditions"""
+        # term[2] is WoLgID (filter for selected language) - rest of filters moved to initial SQl query which loads terms
+        return term[2] == selected_lang
         
     def _create_note(self, term, adjust_ease: bool) -> Optional[Note]:
+        """Handles creation of notes from Lute terms"""
         try:
             note = Note(model=mw.col.models.by_name(self.model_name), col=mw.col)
             zws = '\u200B'
+            # term[0] is WoText from table words - term (word) and term[1] is WoTranslation from table words - term translation, definition
+            # zws = '\u200B' is zero width space which is used for multi-word terms in Lute but is removed here as per suggestion from creator of Lute
             note.fields[0] = term[0].replace(zws, '')
             note.fields[1] = term[1].replace(zws, '')
 
@@ -64,11 +66,13 @@ class NoteCreator:
             return None
             
     def _can_add_note(self, term_front: str) -> bool:
+        # checks whether identical note or note for the same term already exist
         existing_notes = mw.col.find_notes(f'Front:"{term_front}"')
         return not existing_notes or self.allow_duplicates
         
     def _add_note_to_deck(self, note: Note, term, deck_id: int, 
         counter: int) -> int:
+        # Adds tags to note and then adds it into deck
         try:
             tags = self._get_tags(term)
             note.tags = tags
@@ -79,6 +83,7 @@ class NoteCreator:
             return counter
             
     def _get_tags(self, term) -> List[str]:
+        # Copies tags from Lute and tags specified in GUI
         tags = self.tags.copy()
         if term[4] and self.import_tags:
             tags.append(term[4])
