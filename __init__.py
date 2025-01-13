@@ -1,9 +1,11 @@
 # __init__.py
 from aqt import mw
 from aqt.qt import *
+from aqt.gui_hooks import collection_did_load
 from .config import Config
 from .gui import ImporterGui
 from .logger import log_info
+from .auto_import import AutoImporter
 
 def initialize_config():
     """ Ensure config file exists with all necessary keys """
@@ -16,7 +18,8 @@ def initialize_config():
             'import_tags': False,
             'selected_deck': 'Default',
             'adjust_ease': False,
-            'include_WKI': False
+            'include_WKI': False,
+            'auto_import_on_startup': False
             }
     current_config = config.get_config()
     
@@ -24,20 +27,38 @@ def initialize_config():
     missing_keys = {k: v for k, v in default_config.items() if k not in current_config}
     if missing_keys:
         config.update_config(missing_keys)
-        log_info(f'Configuration initialized with default values for {missing_keys}')
+        log_info(f'[init] Configuration initialized with default values for {missing_keys}')
 
+def auto_import_on_startup():
+    """Safely run automatic import only once after collection is loaded."""
+    if mw.col is None:
+        log_info('[init] Anki collection not loaded. Auto-import skipped.')
+        return
+
+    config = Config()
+    if config.get_config_param('auto_import_on_startup'):
+        importer = AutoImporter(config)
+        importer.run_import()
+        log_info('[init] Auto-import on startup executed.')
 
 def show_importer():
-    # Displaying the addon GUI
+    """Display the importer GUI."""
     config = Config()
     mw.myWidget = ImporterGui(config)
-    log_info('Importer GUI launched.')
+    log_info('[init] Importer GUI launched.')
     mw.myWidget.widget.show()
 
-# Initialize config when addon loads
-initialize_config()
+def on_collection_loaded(_):
+    """Initialize config and trigger auto-import safely after collection load."""
+    initialize_config()
 
-# Create menu item
-action = QAction('LUTE to Anki importer', mw)
-qconnect(action.triggered, show_importer)
-mw.form.menuTools.addAction(action)
+    # Add menu item to Tools
+    action = QAction('LUTE to Anki importer', mw)
+    qconnect(action.triggered, show_importer)
+    mw.form.menuTools.addAction(action)
+
+    # Run the auto-import exactly once after collection is ready
+    auto_import_on_startup()
+
+# Hook to run after Anki's collection is fully loaded
+collection_did_load.append(on_collection_loaded)

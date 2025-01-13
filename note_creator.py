@@ -1,5 +1,6 @@
 # note_creator.py
 from aqt import mw
+from aqt.utils import showInfo
 from anki.notes import Note
 from typing import Optional, List
 from .logger import log_info, log_error
@@ -17,7 +18,7 @@ class NoteCreator:
         
     def create_cards(self, terms: List, selected_lang: str) -> int:
         """ Adds Anki cards from LUTE terms into deck with specified settings """
-        log_info(f'Starting to create {selected_lang} notes in deck: {self.deck_name}')
+        log_info(f'[note_creator] Starting to create notes in deck: {self.deck_name}')
         try:
             # sets in which deck the cards should be created and initializes counter of created cards
             deck_id = mw.col.decks.id_for_name(self.deck_name)
@@ -35,11 +36,11 @@ class NoteCreator:
                 if self._can_add_note(term[0]):
                     counter = self._add_note_to_deck(note, term, deck_id, counter)
             
-            log_info(f'Total {counter} cards successfully added to deck {self.deck_name}')
+            log_info(f'[note_creator] Total {counter} cards successfully added to deck {self.deck_name}')
             return counter
             
         except Exception as e:
-            log_error(f'Error creating cards: {str(e)}')
+            log_error(f'[note_creator] Error creating cards: {str(e)}')
             showInfo(f'Error creating cards: {str(e)}')
             return 0
             
@@ -65,7 +66,7 @@ class NoteCreator:
 
             return note
         except Exception as e:
-            log_error(f'Error creating {term} note: {e}')
+            log_error(f'[note_creator] Error creating {term} note: {e}')
             return None
             
     def _can_add_note(self, term_front: str) -> bool:
@@ -81,10 +82,10 @@ class NoteCreator:
             if tags:
                 note.tags = tags
             mw.col.add_note(note, deck_id)
-            log_info(f'Note created for term: {term[0]}')
+            log_info(f'[note_creator] Note created for term: {term[0]}')
             return counter + 1
         except Exception as e:
-            log_error(f'Error creating note for term {term[0]}: {str(e)}')
+            log_error(f'[note_creator] Error creating note for term {term[0]}: {str(e)}')
             return counter
             
     def _get_tags(self, term) -> List[str]:

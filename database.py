@@ -45,22 +45,22 @@ class LuteDatabase:
 
         # Join all conditions with 'AND'
         where_clause = "WHERE " + " AND ".join(where_conditions)
-        log_info('Executing SQL query to fetch terms.')
+        log_info('[database] Executing SQL query to fetch terms.')
         
-        return f"{base_query}\n{where_clause};"
+        return f'{base_query}\n{where_clause};'
 
     def connect(self, parents_only, empty_translation, include_WKI, cutoff_date) -> Tuple[List, List]:
         """ Connect to LUTE database and retrieve terms and languages """
         if not self.db_path.endswith('lute.db'):
             # Checks if file other than lute.db has been selected
             showInfo('Please select a lute.db file')
-            log_error(f'Invalid database file selected: {self.db_path}')
+            log_error(f'[database] Invalid database file selected: {self.db_path}')
             return [], []
             
         try:
             # Connecting to lute.db
             conn = sqlite3.connect(self.db_path)
-            log_info(f'Successfully connected to database: {self.db_path}')
+            log_info(f'[database] Successfully connected to database: {self.db_path}')
             cursor = conn.cursor()
             
             # Get terms (dynamic query based on filters)
@@ -75,10 +75,10 @@ class LuteDatabase:
                         if lang[0] in used_lg_ids]
             
             conn.close()
-            log_info(f'Retrieved {len(terms)} terms and {len(languages)} languages.')
+            log_info(f'[database] Retrieved {len(terms)} terms and {len(languages)} languages.')
             return terms, languages
             
         except Exception as e:
+            log_error(f'[database] Database connection error: {str(e)}')
             showInfo(f'Database connection error: {str(e)}')
-            log_error(f'Database connection error: {str(e)}')
             return [], []

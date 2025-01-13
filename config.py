@@ -16,8 +16,10 @@ class Config:
                 'allow_duplicates': False,
                 'import_tags': False,
                 'selected_deck': 'Default',
+                'selected_model': 'Basic',
                 'adjust_ease': False,
-                'include_WKI': False
+                'include_WKI': False,
+                'auto_import_on_startup': False
                 }
 
     # Get exisiting config or use the default one
@@ -43,7 +45,7 @@ class Config:
 
             return True
         except Exception as e:
-            log_error(f'Configuration update failed: {str(e)}')
+            log_error(f'[config] Configuration update failed: {str(e)}')
             return False
         
     def get_config_param(self, param: str):
@@ -53,5 +55,5 @@ class Config:
             return conf.get(param)
         except Exception as e:
             defaults = self.default_config
-            log_error(f'Requested config parameter {param} not found, using default: {str(e)}')
+            log_error(f'[config] Requested config parameter {param} not found, using default: {str(e)}')
             return defaults.get(param)  # Returns the default value for the param

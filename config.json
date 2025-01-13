@@ -1,10 +1,12 @@
 {
     "lutedb_path": "Open file manager",
+    "auto_import_on_startup": false,
     "parents_only": false,
     "empty_translation": false,
     "allow_duplicates": false,
     "import_tags": false,
     "selected_deck": "Default",
+    "selected_model": "Basic",
     "adjust_ease": false,
     "include_WKI": false
 }
