@@ -1,33 +1,31 @@
-from pathlib import Path
+# config.py
 import json
 from aqt import mw
 import os
-from typing import Tuple, Dict, Any
+from .logger import log_info, log_error
 
 class Config:
     def __init__(self):
-        """Initializing addon directory and ID"""
+        """ Initializing addon directory and ID """
         self.addon_dir = os.path.dirname(os.path.abspath(__file__))
         self.addon_id = os.path.basename(self.addon_dir)
-        
-    def get_config(self) -> Dict[str, Any]:
-        """Get current config or return default config if none exists"""
-        config = mw.addonManager.getConfig(self.addon_id)
-        if config is None:
-            config = {
+        self.default_config = {
                 'lutedb_path': 'Open file manager',
                 'parents_only': False,
                 'empty_translation': False,
                 'allow_duplicates': False,
-                'import_tags': True,
-                'selected_deck': "Default",
+                'import_tags': False,
+                'selected_deck': 'Default',
                 'adjust_ease': False,
                 'include_WKI': False
-            }
-        return config
+                }
+
+    # Get exisiting config or use the default one
+    def get_config(self):
+        return mw.addonManager.getConfig(self.addon_id) or self.default_config
     
     def update_config(self, updates: dict) -> bool:
-        """Update config with new values while preserving existing ones"""
+        """ Update config with new values while preserving existing ones """
         try:
             # Get current config
             current_config = self.get_config()
@@ -42,27 +40,18 @@ class Config:
                 
             # Update Anki's config
             mw.addonManager.writeConfig(self.addon_id, current_config)
-            
+
             return True
         except Exception as e:
-            print(f'Debug - Config update failed: {str(e)}')
+            log_error(f'Configuration update failed: {str(e)}')
             return False
         
     def get_config_param(self, param: str):
-        """Loading parameters from config.json file"""
+        """ Loading parameters from config.json file """
         try:
             conf = self.get_config()
             return conf.get(param)
         except Exception as e:
-            defaults = {
-                'lutedb_path': 'Open file manager',
-                'parents_only': False,
-                'empty_translation': False,
-                'allow_duplicates': False,
-                'import_tags': True,
-                'selected_deck': "Default",
-                'adjust_ease': False,
-                'include_WKI': False
-                }
-            print(f'Debug - Loading {param} failed: {str(e)}')
+            defaults = self.default_config
+            log_error(f'Requested config parameter {param} not found, using default: {str(e)}')
             return defaults.get(param)  # Returns the default value for the param

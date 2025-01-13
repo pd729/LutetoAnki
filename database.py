@@ -1,14 +1,16 @@
+# database.py
 import sqlite3
 from typing import List, Tuple
 from aqt.utils import showInfo
 from datetime import date
+from .logger import log_info, log_error
 
 class LuteDatabase:
     def __init__(self, db_path: str):
         self.db_path = db_path
     
-    def build_sql_query(self, parents_only=False, empty_translation=False, include_WKI=False, cutoff_date=str(date.today())):
-        """Define SQL query for loading terms which should be passed to Anki"""
+    def build_sql_query(self, parents_only=False, empty_translation=False, include_WKI=False, cutoff_date=date.today()):
+        """ Define SQL query for loading terms which should be passed to Anki """
         # SELECT query to load information from lute.db (not all fields are used)
         if parents_only:
             base_query = """
@@ -33,7 +35,7 @@ class LuteDatabase:
                 LEFT JOIN tags AS t ON wt.WtTgID = t.TgID
             """
         # Put together list of conditions to use as filter
-        where_conditions = ["WoTranslation IS NOT NULL", f"WoCreated >= \"{cutoff_date}\""]
+        where_conditions = ["WoTranslation IS NOT NULL", f"WoCreated >= \"{cutoff_date.isoformat()}\""]
 
         if not empty_translation:
             where_conditions.append("WoTranslation <> ''")
@@ -43,19 +45,22 @@ class LuteDatabase:
 
         # Join all conditions with 'AND'
         where_clause = "WHERE " + " AND ".join(where_conditions)
+        log_info('Executing SQL query to fetch terms.')
         
         return f"{base_query}\n{where_clause};"
 
     def connect(self, parents_only, empty_translation, include_WKI, cutoff_date) -> Tuple[List, List]:
-        """Connect to LUTE database and retrieve terms and languages"""
+        """ Connect to LUTE database and retrieve terms and languages """
         if not self.db_path.endswith('lute.db'):
             # Checks if file other than lute.db has been selected
-            showInfo("Please select a lute.db file")
+            showInfo('Please select a lute.db file')
+            log_error(f'Invalid database file selected: {self.db_path}')
             return [], []
             
         try:
             # Connecting to lute.db
             conn = sqlite3.connect(self.db_path)
+            log_info(f'Successfully connected to database: {self.db_path}')
             cursor = conn.cursor()
             
             # Get terms (dynamic query based on filters)
@@ -70,8 +75,10 @@ class LuteDatabase:
                         if lang[0] in used_lg_ids]
             
             conn.close()
+            log_info(f'Retrieved {len(terms)} terms and {len(languages)} languages.')
             return terms, languages
             
         except Exception as e:
             showInfo(f'Database connection error: {str(e)}')
+            log_error(f'Database connection error: {str(e)}')
             return [], []

@@ -2,15 +2,16 @@
 from aqt.qt import *
 from aqt import mw
 from aqt.utils import showInfo
-from typing import List, Callable
+from datetime import date, timedelta
+from typing import List
 from .config import Config
 from .database import LuteDatabase
 from .note_creator import NoteCreator
-from datetime import date, timedelta
+from .logger import log_info, log_error
 
 class ImporterGui:
     def __init__(self, config: Config):
-        # initialiying variables
+        """ Initializing variables """
         self.config = config
         self.widget = QWidget()
         self.widget.setWindowTitle('Lute to Anki importer')
@@ -34,7 +35,7 @@ class ImporterGui:
         self.load_saved_settings()
         
     def create_widgets(self):
-        """Create all GUI widgets"""
+        """ Create all GUI widgets """
         self.path_button = QPushButton(self.widget)
         self.connect_label = QLabel('Connect to lute.db:', self.widget)
         self.connect_button = QPushButton('Click to connect', self.widget)
@@ -56,28 +57,32 @@ class ImporterGui:
         self.import_tags_check_box = QCheckBox('Import tags from LUTE', self.widget)
         self.adjust_ease_check_box = QCheckBox('Adjust ease based on Lute status', self.widget)
         self.include_WKI_check_box = QCheckBox('Include Well known, Ignored', self.widget)
-        
+    
+    def populate_combobox(self, combo: QComboBox, items: List[str]):
+        """ Helper to populate combo boxes with items """
+        combo.clear()
+        combo.addItems(items)
+
     def create_model_combobox(self) -> QComboBox:
-        """Create and populate the note type combo box"""
+        """ Create and populate the note type combo box """
         combo = QComboBox(self.widget)
-        for model in mw.col.models.all():
-            combo.addItem(model['name'])
+        model_names = [model['name'] for model in mw.col.models.all()]
+        self.populate_combobox(combo, model_names)
         if combo.count() > 0:
             self.selected_model = combo.itemText(0)
         return combo
         
     def create_deck_combobox(self) -> QComboBox:
-        """Create and populate the deck combo box"""
+        """ Create and populate the deck combo box """
         combo = QComboBox(self.widget)
-        decks = mw.col.decks.all_names_and_ids()
-        for deck in decks:
-            combo.addItem(deck.name)
+        deck_names = [deck.name for deck in mw.col.decks.all_names_and_ids()]
+        self.populate_combobox(combo, deck_names)
         if combo.count() > 0:
             self.selected_deck = combo.itemText(0)
         return combo
         
     def create_layout(self):
-        """Creating 2 column layout with widgets defined in create_widgets"""
+        """ Creating 2 column layout with widgets defined in create_widgets """
         layout = QFormLayout(self.widget)
         layout.addRow('Select lute.db file to import:', self.path_button)
         layout.addRow(self.parents_only_check_box, self.empty_translation_check_box)
@@ -93,7 +98,7 @@ class ImporterGui:
         self.widget.setLayout(layout)
         
     def connect_signals(self):
-        """Function handling updating of values selected in GUI"""
+        """ Function handling updating of values selected in GUI """
         self.path_button.clicked.connect(self.find_file)
         self.connect_button.clicked.connect(self.connect_to_lutedb)
         self.import_button.clicked.connect(self.create_cards)
@@ -110,11 +115,12 @@ class ImporterGui:
         self.include_WKI_check_box.stateChanged.connect(self.update_checks)
         
     def load_saved_settings(self):
-        """Loading last settings from config.json file"""
+        """ Loading last settings from config.json file """
+        log_info(f'Loading saved settings from config.json')
         path = self.config.get_config_param('lutedb_path')
         self.path_button.setText(path)
 
-        # loading settings from config.json
+        # Loading settings from config.json
         parents_only = self.config.get_config_param('parents_only')
         empty_translation = self.config.get_config_param('empty_translation')
         allow_duplicates = self.config.get_config_param('allow_duplicates')
@@ -122,7 +128,7 @@ class ImporterGui:
         adjust_ease = self.config.get_config_param('adjust_ease')
         include_WKI = self.config.get_config_param('include_WKI')
 
-        # updating states of checkboxes based on loaded settings
+        # Updating states of checkboxes based on loaded settings
         self.parents_only_check_box.setChecked(parents_only)
         self.empty_translation_check_box.setChecked(empty_translation)
         self.duplicate_check_box.setChecked(allow_duplicates)
@@ -130,28 +136,29 @@ class ImporterGui:
         self.adjust_ease_check_box.setChecked(adjust_ease)
         self.include_WKI_check_box.setChecked(include_WKI)
 
-        # loading and (setting if possible) default deck to use
+        # Loading and (setting if possible) default deck to use
         saved_deck = self.config.get_config_param('selected_deck')
         if saved_deck in [self.deck_options.itemText(i) for i in range(self.deck_options.count())]:
             self.deck_options.setCurrentText(saved_deck)
         
     def find_file(self):
-        """Open file browser to select the lute.db file"""
+        """ Open file browser to select the lute.db file """
         file_dialog = QFileDialog()
         db_path = file_dialog.getOpenFileName()[0]
         self.path_button.setText(db_path)
         self.connect_button.setEnabled(True)
         self.connect_label.setText('Connect to lute.db:')
-        self.connect_button.setText("Click to connect")
+        self.connect_button.setText('Click to connect')
         
     def connect_to_lutedb(self):
-        """Connect to the LUTE database and load terms/languages"""
+        """ Connect to the LUTE database and load terms/languages """
+        log_info('User initiated connection to LUTE database.')
         db_path = self.path_button.text()
         db = LuteDatabase(db_path)
-        self.parents_only=self.parents_only_check_box.isChecked(),
-        self.empty_translation=self.empty_translation_check_box.isChecked(),
-        self.terms, self.languages = db.connect(self.parents_only_check_box.isChecked(), self.empty_translation_check_box.isChecked(),
-                                                self.include_WKI_check_box.isChecked(), str(date.today() - timedelta(days=self.time_box.value()))
+        self.parents_only=self.parents_only_check_box.isChecked()
+        self.empty_translation=self.empty_translation_check_box.isChecked()
+        self.terms, self.languages = db.connect(self.parents_only, self.empty_translation,
+                                                self.include_WKI_check_box.isChecked(), date.today() - timedelta(days=self.time_box.value())
                                                )
         
         # Update connect_button after loading terms and connect_label to show how many terms were loaded
@@ -167,15 +174,14 @@ class ImporterGui:
             # Save path and update UI - enabling creation of Anki notes
             self.config.update_config({'lutedb_path': db_path})
             self.import_button.setEnabled(True)
-            
-            showInfo(f'Connected and loaded {len(self.terms)} terms')
 
-        # adding infobox in case no terms are loaded
+        # Adding infobox in case no terms are loaded
         else:
+            log_info(f'No terms meet criteria based on chosen filters')
             showInfo(f'No terms meet criteria based on chosen filters')
             
     def update_variables(self):
-        """Update values when user selects different options"""
+        """ Update values when user selects different options """
         if self.language_options.currentIndex() >= 0:
             self.selected_lang = self.languages[self.language_options.currentIndex()][0]
             
@@ -186,7 +192,7 @@ class ImporterGui:
         self.tags = self.tag_input_box.text().split()
         
     def update_checks(self):
-        """Update checkbox settings"""
+        """ Update checkbox settings """
         self.config.update_config({
             'parents_only': self.parents_only_check_box.isChecked(),
             'empty_translation': self.empty_translation_check_box.isChecked(),
@@ -197,17 +203,18 @@ class ImporterGui:
         })
         
     def create_cards(self):
-        """Create new Anki cards from selected terms"""
+        """ Create new Anki cards from selected terms """
+        log_info('User initiated card creation process.')
         creator = NoteCreator(
             model_name=self.selected_model,
             deck_name=self.selected_deck,
             allow_duplicates=self.duplicate_check_box.isChecked(),
             import_tags=self.import_tags_check_box.isChecked(),
             adjust_ease=self.adjust_ease_check_box.isChecked(),
-            include_WKI=self.include_WKI_check_box.isChecked(),
             tags=self.tags,
         )
         
         cards_added = creator.create_cards(self.terms, self.selected_lang)
         from aqt.utils import showInfo
-        showInfo(f'{cards_added} cards added to deck {self.selected_deck}')
+        log_info(f'{cards_added} cards successfully imported into {self.selected_deck}')
+        showInfo(f'{cards_added} cards successfully imported into {self.selected_deck}')
