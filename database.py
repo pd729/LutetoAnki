@@ -9,7 +9,7 @@ class LuteDatabase:
     def __init__(self, db_path: str):
         self.db_path = db_path
     
-    def build_sql_query(self, parents_only=False, empty_translation=False, include_WKI=False, cutoff_date=date.today()):
+    def build_sql_query(self, parents_only=False, empty_translation=False, include_WKI=False, cutoff_date=date.today(), include_unknown=False):
         """ Define SQL query for loading terms which should be passed to Anki """
         # SELECT query to load information from lute.db (not all fields are used)
         if parents_only:
@@ -34,14 +34,20 @@ class LuteDatabase:
                 LEFT JOIN wordtags AS wt ON wi.WiWoID = wt.WtWoID 
                 LEFT JOIN tags AS t ON wt.WtTgID = t.TgID
             """
-        # Put together list of conditions to use as filter
+        # Put together list of conditions to use as filter, Filtering out terms with NULL translation and based on date
         where_conditions = ["WoTranslation IS NOT NULL", f"WoCreated >= \"{cutoff_date.isoformat()}\""]
 
+        # Filter out terms with blank translations
         if not empty_translation:
             where_conditions.append("WoTranslation <> ''")
 
+        # Filter out terms with statuses 98, 99
         if not include_WKI:
             where_conditions.append("WoStatus <= 5")
+        
+        # Filter out terms with status 0
+        if not include_unknown:
+            where_conditions.append("1 <= WoStatus")
 
         # Join all conditions with 'AND'
         where_clause = "WHERE " + " AND ".join(where_conditions)
