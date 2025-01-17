@@ -57,7 +57,7 @@ class NoteCreator:
             # term[0] is WoText from table words - term (word) and term[1] is WoTranslation from table words - term translation, definition
             # zws = '\u200B' is zero width space which is used for multi-word terms in Lute but is removed here as per suggestion from creator of Lute
             note.fields[0] = term[0].replace(zws, '')
-            note.fields[1] = term[1].replace(zws, '')
+            note.fields[1] = term[1].replace(zws, '').replace('\r\n', '\n')
 
             if adjust_ease:
                 """ Assigning ease based on status in Lute giving default 250% to Status=3 and increasing/decreasing by 15% per level, """
