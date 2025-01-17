@@ -17,9 +17,13 @@ def initialize_config():
             'allow_duplicates': False,
             'import_tags': False,
             'selected_deck': 'Default',
+            'selected_model': 'Basic',
             'adjust_ease': False,
             'include_WKI': False,
-            'auto_import_on_startup': False
+            'selected_lang': 0,
+            'last_days': 0,
+            'tags': [],
+            'auto_import': False
             }
     current_config = config.get_config()
     
@@ -46,6 +50,13 @@ def show_importer():
     config = Config()
     mw.myWidget = ImporterGui(config)
     log_info('[init] Importer GUI launched.')
+
+    # Refresh Anki after closing the GUI
+    def on_close(event):
+        mw.reset()
+        event.accept()
+
+    mw.myWidget.widget.closeEvent = on_close
     mw.myWidget.widget.show()
 
 def on_collection_loaded(_):
