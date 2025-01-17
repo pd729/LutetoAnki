@@ -1,3 +1,4 @@
+# gui.py
 from aqt.qt import *
 from aqt import mw
 from aqt.utils import showInfo
@@ -6,7 +7,7 @@ from typing import List
 from .config import Config
 from .database import LuteDatabase
 from .note_creator import NoteCreator
-from .logger import log_info, log_error
+from .logger import log_info, log_warning, log_error
 import os
 
 class ImporterGui:
@@ -58,12 +59,18 @@ class ImporterGui:
         self.include_WKI_check_box = QCheckBox('Include Well known, Ignored', self.widget)
         self.auto_import_check_box = QCheckBox('Enable Auto Import', self.widget)
 
-        self.db_group = QGroupBox("Database Connection")
+        # Grouping together checkboxes for easier referencing and updating
+        self.checkboxes = {
+            'parents_only': self.parents_only_check_box,
+            'empty_translation': self.empty_translation_check_box,
+            'allow_duplicates': self.duplicate_check_box,
+            'import_tags': self.import_tags_check_box,
+            'adjust_ease': self.adjust_ease_check_box,
+            'include_WKI': self.include_WKI_check_box,
+            'auto_import': self.auto_import_check_box
+        }
 
-        self.log_preview = QTextEdit(self.widget)
-        self.log_preview.setReadOnly(True)
-        self.log_preview.setFixedHeight(100)
-        self.load_log_preview()
+        self.db_group = QGroupBox("Database Connection")
     
     def populate_combobox(self, combo: QComboBox, items: List[str]):
         """ Helper to populate combo boxes with items """
@@ -75,7 +82,9 @@ class ImporterGui:
         model_names = [model['name'] for model in mw.col.models.all()]
         self.populate_combobox(combo, model_names)
         if combo.count() > 0:
-            self.selected_model = combo.itemText(0)
+            saved_deck = self.config.get_config_param('selected_deck')
+            if saved_deck in [combo.itemText(i) for i in range(combo.count())]:
+                combo.setCurrentText(saved_deck)
         return combo
 
     def create_deck_combobox(self):
@@ -100,7 +109,7 @@ class ImporterGui:
         options_layout.addRow(self.parents_only_check_box, self.empty_translation_check_box)
         options_layout.addRow(self.include_WKI_check_box, self.import_tags_check_box)
         options_layout.addRow(self.adjust_ease_check_box, self.duplicate_check_box)
-        options_layout.addRow('Time filter (x days before today):', self.time_box)
+        options_layout.addRow('Age (days since created)::', self.time_box)
         options_layout.addRow('Write tags to add to cards:', self.tag_input_box)
         options_group.setLayout(options_layout)
 
@@ -116,8 +125,6 @@ class ImporterGui:
         layout.addWidget(deck_group)
         layout.addWidget(self.auto_import_check_box)
         layout.addWidget(self.import_button)
-        layout.addWidget(QLabel("Log Preview:"))
-        layout.addWidget(self.log_preview)
         self.widget.setLayout(layout)
 
     def connect_signals(self):
@@ -130,13 +137,10 @@ class ImporterGui:
         self.deck_options.currentIndexChanged.connect(self.update_variables)
         self.time_box.valueChanged.connect(self.update_variables)
         self.tag_input_box.editingFinished.connect(self.update_variables)
-        self.parents_only_check_box.stateChanged.connect(self.update_checks)
-        self.empty_translation_check_box.stateChanged.connect(self.update_checks)
-        self.duplicate_check_box.stateChanged.connect(self.update_checks)
-        self.import_tags_check_box.stateChanged.connect(self.update_checks)
-        self.adjust_ease_check_box.stateChanged.connect(self.update_checks)
-        self.include_WKI_check_box.stateChanged.connect(self.update_checks)
-        self.auto_import_check_box.stateChanged.connect(self.update_checks)
+
+        # Batch connect all checkboxes to update_checks
+        for checkbox in self.checkboxes.values():
+            checkbox.stateChanged.connect(self.update_checks)
         
     def load_saved_settings(self):
         """ Loading last settings from config.json file """
@@ -144,28 +148,27 @@ class ImporterGui:
         path = self.config.get_config_param('lutedb_path')
         self.path_button.setText(path)
 
-        # Loading settings from config.json
+        # loading settings from config.json
         parents_only = self.config.get_config_param('parents_only')
         empty_translation = self.config.get_config_param('empty_translation')
         allow_duplicates = self.config.get_config_param('allow_duplicates')
         import_tags = self.config.get_config_param('import_tags')
         adjust_ease = self.config.get_config_param('adjust_ease')
         include_WKI = self.config.get_config_param('include_WKI')
-        auto_import = self.config.get_config_param('auto_import_on_startup')
+        last_days = self.config.get_config_param('last_days')
+        auto_import = self.config.get_config_param('auto_import')
+        selected_deck = self.config.get_config_param('selected_deck')
 
-        # Updating states of checkboxes based on loaded settings
+        # updating states of checkboxes based on loaded settings
         self.parents_only_check_box.setChecked(parents_only)
         self.empty_translation_check_box.setChecked(empty_translation)
         self.duplicate_check_box.setChecked(allow_duplicates)
         self.import_tags_check_box.setChecked(import_tags)
         self.adjust_ease_check_box.setChecked(adjust_ease)
         self.include_WKI_check_box.setChecked(include_WKI)
+        self.time_box.setValue(last_days)
         self.auto_import_check_box.setChecked(auto_import)
-
-        # Loading and (setting if possible) default deck to use
-        saved_deck = self.config.get_config_param('selected_deck')
-        if saved_deck in [self.deck_options.itemText(i) for i in range(self.deck_options.count())]:
-            self.deck_options.setCurrentText(saved_deck)
+        self.deck_options.setCurrentText(selected_deck)
 
         # Attempt automatic connection if a valid path is set
         if path != 'Open file manager' and os.path.exists(path):
@@ -174,21 +177,12 @@ class ImporterGui:
         else:
             log_info(f'[gui] No valid LUTE database path found in config.')
 
-    def load_log_preview(self):
-        if os.path.exists('lute_importer.log'):
-            with open('lute_importer.log', 'r') as log_file:
-                logs = log_file.read()
-                self.log_preview.setText(logs)
-        else:
-            self.log_preview.setText("Log file not found.")
-
     def find_file(self):
         """ Open file browser to select the lute.db file """
         file_dialog = QFileDialog()
         db_path = file_dialog.getOpenFileName()[0]
         self.path_button.setText(db_path)
         self.connect_button.setEnabled(True)
-        self.connect_label.setText('Connect to lute.db:')
         self.connect_button.setText('Click to connect')
         
     def connect_to_lutedb(self):
@@ -202,8 +196,9 @@ class ImporterGui:
                                                 self.include_WKI_check_box.isChecked(), date.today() -      timedelta(days=self.time_box.value())
                                                )
         
-        # Update connect_button after loading terms
+        # Update connect_and import button after loading terms
         self.connect_button.setText('Reload terms')
+        self.import_button.setText(f'Import {len(self.terms)} terms to deck {self.selected_deck}')
 
         # Get the current time in HH:MM:SS format
         current_time = datetime.now().strftime("%H:%M:%S")
@@ -221,33 +216,28 @@ class ImporterGui:
             self.config.update_config({'lutedb_path': db_path})
             self.import_button.setEnabled(True)
 
-        # Adding infobox in case no terms are loaded
         else:
-            log_info(f'[gui] No terms meet criteria based on chosen filters')
-            showInfo(f'No terms meet criteria based on chosen filters')
+            log_warning(f'[gui] No terms meet criteria based on chosen filters')
             
     def update_variables(self):
         """ Update values when user selects different options """
         if self.language_options.currentIndex() >= 0:
             self.selected_lang = self.languages[self.language_options.currentIndex()][0]
+            self.config.update_config({'selected_lang': self.selected_lang})
             
         self.selected_model = self.model_options.currentText()
+        self.config.update_config({'selected_model': self.selected_model})
         self.selected_deck = self.deck_options.currentText()
         self.config.update_config({'selected_deck': self.selected_deck})
         self.last_days = self.time_box.value()
+        self.config.update_config({'last_days': self.last_days})
         self.tags = self.tag_input_box.text().split()
+        self.config.update_config({'tags': self.tags})
         
     def update_checks(self):
         """ Update checkbox settings """
-        self.config.update_config({
-            'parents_only': self.parents_only_check_box.isChecked(),
-            'empty_translation': self.empty_translation_check_box.isChecked(),
-            'allow_duplicates': self.duplicate_check_box.isChecked(),
-            'import_tags': self.import_tags_check_box.isChecked(),
-            'adjust_ease': self.adjust_ease_check_box.isChecked(),
-            'include_WKI': self.include_WKI_check_box.isChecked(),
-            'auto_import_on_startup': self.auto_import_check_box.isChecked()
-        })
+        updates = {key: checkbox.isChecked() for key, checkbox in self.checkboxes.items()}
+        self.config.update_config(updates)
 
     def create_cards(self):
         log_info('User initiated card creation process.')
@@ -260,4 +250,5 @@ class ImporterGui:
             tags=self.tag_input_box.text().split()
         )
         cards_added = creator.create_cards(self.terms, self.selected_lang)
+        log_info(f'[gui] Total {cards_added} cards successfully added to deck {self.selected_deck}\n(ignored {len(self.terms)-cards_added} duplicates)')
         showInfo(f'Total {cards_added} cards successfully added to deck {self.selected_deck}\n(ignored {len(self.terms)-cards_added} duplicates)')
