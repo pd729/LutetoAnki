@@ -1,6 +1,5 @@
 # logger.py
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lute_importer.log')
