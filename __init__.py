@@ -40,7 +40,7 @@ def auto_import_on_startup():
         return
 
     config = Config()
-    if config.get_config_param('auto_import_on_startup'):
+    if config.get_config_param('auto_import'):
         importer = AutoImporter(config)
         importer.run_import()
         log_info('[init] Auto-import on startup executed.')
