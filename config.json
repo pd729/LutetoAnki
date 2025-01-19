@@ -6,10 +6,10 @@
     "import_tags": false,
     "selected_deck": "Default",
     "selected_model": "Basic",
-    "selected_lang": 1,
-    "last_days": 0,
     "adjust_ease": false,
     "include_WKI": false,
+    "selected_lang": 0,
+    "last_days": 0,
     "tags": [],
     "auto_import": false
 }

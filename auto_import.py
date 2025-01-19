@@ -1,9 +1,10 @@
 # auto_import.py
-from aqt.utils import showInfo
 from datetime import date, timedelta
+from aqt.utils import showInfo
 from .database import LuteDatabase
+from .logger import log_debug, log_error, log_info
 from .note_creator import NoteCreator
-from .logger import log_info, log_error
+
 
 class AutoImporter:
     def __init__(self, config):
@@ -12,6 +13,7 @@ class AutoImporter:
     def run_import(self):
         try:
             db_path = self.config.get_config_param('lutedb_path')
+            log_debug(f'[auto import] Loaded db path: {db_path}')
             if db_path == 'Open file manager':
                 log_error('[auto_import] Auto-import failed: LUTE database path is not set.')
                 return
@@ -38,8 +40,10 @@ class AutoImporter:
                     tags=self.config.get_config_param('tags')
                 )
                 cards_added = creator.create_cards(terms, selected_lang)
-                log_info(f'[auto import] Total {cards_added} cards successfully added to deck {selected_deck}\n(ignored {len(terms)-cards_added} duplicates)')
-                showInfo(f'Total {cards_added} cards successfully added to deck {selected_deck}\n(ignored {len(terms)-cards_added} duplicates)')
+                log_info(f'[auto import] Total {cards_added} cards added to deck {selected_deck}\n'
+                         f'(ignored {len(terms)-cards_added} duplicates)')
+                showInfo(f'Total {cards_added} cards added to deck {selected_deck}\n'
+                         f'(ignored {len(terms)-cards_added} duplicates)')
             else:
                 log_info('[auto_import] Auto-import completed: No new terms found.')
         except Exception as e:

@@ -1,14 +1,15 @@
 # gui.py
-from aqt.qt import *
-from aqt import mw
-from aqt.utils import showInfo
 from datetime import date, datetime, timedelta
+import os
 from typing import List
+from aqt import mw
+from aqt.qt import *
+from aqt.utils import showInfo
 from .config import Config
 from .database import LuteDatabase
+from .logger import log_info, log_warning
 from .note_creator import NoteCreator
-from .logger import log_info, log_warning, log_error
-import os
+
 
 class ImporterGui:
     def __init__(self, config: Config):
@@ -43,7 +44,7 @@ class ImporterGui:
         self.import_button.setEnabled(False)
 
         self.model_options = self.create_model_combobox()
-        self.language_options = QComboBox(self.widget)
+        self.lang_options = QComboBox(self.widget)
         self.deck_options = self.create_deck_combobox()
 
         self.time_box = QSpinBox(self.widget)
@@ -70,8 +71,8 @@ class ImporterGui:
             'auto_import': self.auto_import_check_box
         }
 
-        self.db_group = QGroupBox("Database Connection")
-    
+        self.db_group = QGroupBox('Database Connection')
+
     def populate_combobox(self, combo: QComboBox, items: List[str]):
         """ Helper to populate combo boxes with items """
         combo.clear()
@@ -109,14 +110,14 @@ class ImporterGui:
         options_layout.addRow(self.parents_only_check_box, self.empty_translation_check_box)
         options_layout.addRow(self.include_WKI_check_box, self.import_tags_check_box)
         options_layout.addRow(self.adjust_ease_check_box, self.duplicate_check_box)
-        options_layout.addRow('Age (days since created)::', self.time_box)
+        options_layout.addRow('Age (days since created):', self.time_box)
         options_layout.addRow('Write tags to add to cards:', self.tag_input_box)
         options_group.setLayout(options_layout)
 
-        deck_group = QGroupBox("Deck and Model Selection")
+        deck_group = QGroupBox('Deck and Model Selection')
         deck_layout = QFormLayout()
         deck_layout.addRow('Card type:', self.model_options)
-        deck_layout.addRow('Language:', self.language_options)
+        deck_layout.addRow('Language:', self.lang_options)
         deck_layout.addRow('Select deck for import:', self.deck_options)
         deck_group.setLayout(deck_layout)
 
@@ -133,7 +134,7 @@ class ImporterGui:
         self.connect_button.clicked.connect(self.connect_to_lutedb)
         self.import_button.clicked.connect(self.create_cards)
         self.model_options.currentIndexChanged.connect(self.update_variables)
-        self.language_options.currentIndexChanged.connect(self.update_variables)
+        self.lang_options.currentIndexChanged.connect(self.update_variables)
         self.deck_options.currentIndexChanged.connect(self.update_variables)
         self.time_box.valueChanged.connect(self.update_variables)
         self.tag_input_box.editingFinished.connect(self.update_variables)
@@ -141,10 +142,10 @@ class ImporterGui:
         # Batch connect all checkboxes to update_checks
         for checkbox in self.checkboxes.values():
             checkbox.stateChanged.connect(self.update_checks)
-        
+
     def load_saved_settings(self):
         """ Loading last settings from config.json file """
-        log_info(f'[gui] Loading saved settings from config.json')
+        log_info('[gui] Loading saved settings from config.json')
         path = self.config.get_config_param('lutedb_path')
         self.path_button.setText(path)
 
@@ -175,7 +176,7 @@ class ImporterGui:
             log_info(f'[gui] Attempting to connect to LUTE database at {path}')
             self.connect_to_lutedb()
         else:
-            log_info(f'[gui] No valid LUTE database path found in config.')
+            log_info('[gui] No valid LUTE database path found in config.')
 
     def find_file(self):
         """ Open file browser to select the lute.db file """
@@ -184,47 +185,60 @@ class ImporterGui:
         self.path_button.setText(db_path)
         self.connect_button.setEnabled(True)
         self.connect_button.setText('Click to connect')
-        
+
     def connect_to_lutedb(self):
         """ Connect to the LUTE database and load terms/languages """
         log_info('[gui] User initiated connection to LUTE database.')
         db_path = self.path_button.text()
         db = LuteDatabase(db_path)
-        self.parents_only=self.parents_only_check_box.isChecked()
-        self.empty_translation=self.empty_translation_check_box.isChecked()
-        self.terms, self.languages = db.connect(self.parents_only, self.empty_translation,
-                                                self.include_WKI_check_box.isChecked(), date.today() -      timedelta(days=self.time_box.value())
-                                               )
-        
+        self.parents_only = self.parents_only_check_box.isChecked()
+        self.empty_translation = self.empty_translation_check_box.isChecked()
+        self.terms, self.languages = db.connect(self.parents_only,
+                                                self.empty_translation,
+                                                self.include_WKI_check_box.isChecked(),
+                                                date.today() - timedelta(days=self.time_box.value())
+                                                )
+
+        # Get the current time in HH:MM:SS format
+        current_time = datetime.now().strftime("%H:%M:%S")
+
+        # Update the Database Connection group title
+        current_lang = self.config.get_config_param('selected_lang')
+        if current_lang:
+            self.terms = [term for term in self.terms if term[2] == current_lang]
+        self.db_group.setTitle(f"Database Connection - {current_time} ({len(self.terms)} terms)")
+
         # Update connect_and import button after loading terms
         self.connect_button.setText('Reload terms')
         self.import_button.setText(f'Import {len(self.terms)} terms to deck {self.selected_deck}')
 
-        # Get the current time in HH:MM:SS format
-        current_time = datetime.now().strftime("%H:%M:%S")
-    
-        # Update the Database Connection group title
-        self.db_group.setTitle(f"Database Connection - {current_time} ({len(self.terms)} terms)")
-
         if self.terms and self.languages:
             # Update language combo box
-            self.language_options.clear()
+            self.lang_options.clear()
             for lang in self.languages:
-                self.language_options.addItem(lang[1])
-            
+                self.lang_options.addItem(lang[1])
+                self.lang_options.setItemData(self.lang_options.count() - 1, lang[0])
+
+            lg_index = self.lang_options.findData(self.config.get_config_param('selected_lang'))
+            if lg_index >= 0:
+                self.lang_options.setCurrentIndex(lg_index)
+            else:
+                self.lang_options.setCurrentIndex(0)
+
             # Save path and update UI - enabling creation of Anki notes
             self.config.update_config({'lutedb_path': db_path})
             self.import_button.setEnabled(True)
 
         else:
-            log_warning(f'[gui] No terms meet criteria based on chosen filters')
-            
+            log_warning('[gui] No terms meet criteria based on chosen filters')
+
     def update_variables(self):
         """ Update values when user selects different options """
-        if self.language_options.currentIndex() >= 0:
-            self.selected_lang = self.languages[self.language_options.currentIndex()][0]
-            self.config.update_config({'selected_lang': self.selected_lang})
-            
+        if self.lang_options.currentIndex() >= 0:
+            self.selected_lang = self.lang_options.itemData(self.lang_options.currentIndex())
+            if self.selected_lang:
+                self.config.update_config({'selected_lang': self.selected_lang})
+
         self.selected_model = self.model_options.currentText()
         self.config.update_config({'selected_model': self.selected_model})
         self.selected_deck = self.deck_options.currentText()
@@ -233,7 +247,7 @@ class ImporterGui:
         self.config.update_config({'last_days': self.last_days})
         self.tags = self.tag_input_box.text().split()
         self.config.update_config({'tags': self.tags})
-        
+
     def update_checks(self):
         """ Update checkbox settings """
         updates = {key: checkbox.isChecked() for key, checkbox in self.checkboxes.items()}
@@ -250,5 +264,7 @@ class ImporterGui:
             tags=self.tag_input_box.text().split()
         )
         cards_added = creator.create_cards(self.terms, self.selected_lang)
-        log_info(f'[gui] Total {cards_added} cards successfully added to deck {self.selected_deck}\n(ignored {len(self.terms)-cards_added} duplicates)')
-        showInfo(f'Total {cards_added} cards successfully added to deck {self.selected_deck}\n(ignored {len(self.terms)-cards_added} duplicates)')
+        log_info(f'[gui] Total {cards_added} cards added to deck {self.selected_deck}\n'
+                 f'(ignored {len(self.terms)-cards_added} terms)')
+        showInfo(f'Total {cards_added} cards added to deck {self.selected_deck}\n'
+                 f'(ignored {len(self.terms)-cards_added} terms)')
